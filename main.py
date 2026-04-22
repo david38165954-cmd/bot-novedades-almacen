@@ -9,11 +9,14 @@ DAVID_ADMIN_ID = 1391102818  # Tu ID de Telegram
 SHEET_ID = "1muS4qETcWdyh0zvbhl3-sJ7uQIxwBNhUMHP109rF3dQ"
 
 bot = telebot.TeleBot(BOT_TOKEN)
-try:
-    gc = gspread.service_account(filename="credentials.json")
-    worksheet = gc.open_by_key(SHEET_ID).sheet1
-except Exception as e:
-    print(f"Error conectando a Sheets: {e}")
+worksheet = None
+
+def get_worksheet():
+    global worksheet
+    if worksheet is None:
+        gc = gspread.service_account(filename="credentials.json")
+        worksheet = gc.open_by_key(SHEET_ID).sheet1
+    return worksheet
 
 EMPLEADOS = {
     "543489674990": {"legajo": "5210", "nombre": "Alcaraz Ronald"},
@@ -232,7 +235,8 @@ def handle_approval(call):
         ]
         
         try:
-            worksheet.append_row(fila)
+            ws = get_worksheet()
+            ws.append_row(fila)
             bot.edit_message_text(f"{call.message.text}\n\n✅ **¡APROBADO Y GUARDADO EN EXCEL!**", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
             
             notif = f"✅ David acaba de **APROBAR** tu solicitud de {data['tipo']}."
