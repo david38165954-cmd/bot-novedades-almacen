@@ -248,6 +248,15 @@ def handle_approval(call):
         bot.edit_message_text(f"{call.message.text}\n\n❌ **RECHAZADO.**", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
         bot.send_message(data['chat_id'], f"❌ Hola {data['nombre']}, tu solicitud ha sido **RECHAZADA** en esta ocasión.", parse_mode="Markdown")
 
+@bot.message_handler(func=lambda message: True)
+def handle_unknown(message):
+    chat_id = message.chat.id
+    if chat_id not in verified_users:
+        bot.send_message(chat_id, "Hola, envía /start para comenzar y verificar tu identidad.")
+    else:
+        # Si ya está verificado, le mostramos el menú principal de nuevo
+        show_main_menu(chat_id)
+
 print("-----------------------------------------")
 print("Bot Almacen Granix Inciado Exitosamente con Compensación Múltiple!")
 print("-----------------------------------------")
