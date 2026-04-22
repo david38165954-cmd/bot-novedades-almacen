@@ -182,8 +182,8 @@ def finalize_request(chat_id):
         "legajo": empleado['legajo'],
         "nombre": empleado['nombre'],
         "tipo": session['tipo'],
-        "fecha": session.get('fecha_falta') if session['tipo'] != 'Cambio de Turno' else "Múltiple", 
-        "horas_o_rango": session.get('horas') if session['tipo'] != 'Cambio de Turno' else session.get('fecha_falta'),
+        "fecha": session.get('fecha_falta'), 
+        "horas_o_rango": session.get('horas') if session['tipo'] != 'Cambio de Turno' else session.get('horario_falta'),
         "detalles": desc_comp,
         "chat_id": chat_id
     }
