@@ -92,9 +92,47 @@ def handle_novedad_type(message):
     if tipo == "Cambio de Turno":
         bot.send_message(chat_id, "Seleccionaste **Cambio de Turno**.\n\nPara empezar, dime **la FECHA EXACTA** en la que te vas a ausentar / faltar. (Ej: 2026-04-12)", parse_mode="Markdown", reply_markup=markup)
         bot.register_next_step_handler(message, process_ct_date)
+    elif tipo == "Reemplazo":
+        bot.send_message(chat_id, "Seleccionaste **Reemplazo**.\n\nPara empezar, dime **la FECHA EXACTA** del reemplazo. (Ej: 2026-04-12)", parse_mode="Markdown", reply_markup=markup)
+        bot.register_next_step_handler(message, process_re_date)
     else:
         bot.send_message(chat_id, f"Seleccionaste **{tipo}**.\n¿A qué día corresponde? (Si no es hoy o ayer, escríbelo. Ej: 2026-04-12)", reply_markup=markup, parse_mode="Markdown")
         bot.register_next_step_handler(message, process_date_he)
+
+def process_re_date(message):
+    chat_id = message.chat.id
+    if message.text == "Cancelar":
+        show_main_menu(chat_id)
+        return
+        
+    fecha_texto = message.text
+    if fecha_texto == "Hoy":
+        fecha_texto = datetime.now().strftime("%Y-%m-%d")
+    elif fecha_texto == "Ayer":
+        fecha_texto = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        
+    user_sessions[chat_id]["fecha_falta"] = fecha_texto
+    bot.send_message(chat_id, "¿Cuántas horas o en qué **horario exacto** reemplazaste?\n(Ej: De 14:00 a 22:00, o 8hs)", reply_markup=telebot.types.ReplyKeyboardRemove())
+    bot.register_next_step_handler(message, process_re_horario)
+
+def process_re_horario(message):
+    chat_id = message.chat.id
+    if message.text == "Cancelar":
+        show_main_menu(chat_id)
+        return
+        
+    user_sessions[chat_id]["horario_falta"] = message.text
+    bot.send_message(chat_id, "Por último, ¿**Qué tarea** o a qué puesto reemplazaste?\n(Ej: Encargado, Maquinista, etc.)")
+    bot.register_next_step_handler(message, process_re_tarea)
+
+def process_re_tarea(message):
+    chat_id = message.chat.id
+    if message.text == "Cancelar":
+        show_main_menu(chat_id)
+        return
+        
+    user_sessions[chat_id]["detalles_compensacion"] = message.text
+    finalize_request(chat_id)
 
 def process_ct_date(message):
     chat_id = message.chat.id
@@ -164,26 +202,20 @@ def finalize_request(chat_id):
     
     req_id = f"req_{int(datetime.now().timestamp())}_{chat_id}"
     
-    # Manejar variables dependiendo si es HE o CT
-    fecha_info = session.get("fecha_falta", "")
-    # Para HE las horas estan en 'horas'. Para CT el texto del rango está en 'fecha_falta'. 
-    # Mejor separemos en la vista
-    if session['tipo'] == 'Cambio de Turno':
+    # Manejar variables dependiendo del tipo
+    if session['tipo'] in ['Cambio de Turno', 'Reemplazo']:
         desc_falta = session.get("fecha_falta", "")
         desc_comp = session.get("detalles_compensacion", "")
     else:
         desc_falta = f"{session.get('fecha_falta')} - {session.get('horas')}hs"
         desc_comp = ""
         
-    # Standard data to save
-    # "Timestamp", "Legajo", "Nombre", "Tipo Novedad", "Fecha Solicitud", "Horas/Horario Falta", "Detalles de Compensacion"
-    
     data = {
         "legajo": empleado['legajo'],
         "nombre": empleado['nombre'],
         "tipo": session['tipo'],
         "fecha": session.get('fecha_falta'), 
-        "horas_o_rango": session.get('horas') if session['tipo'] != 'Cambio de Turno' else session.get('horario_falta'),
+        "horas_o_rango": session.get('horas') if session['tipo'] == 'Horas Extras' else session.get('horario_falta'),
         "detalles": desc_comp,
         "chat_id": chat_id
     }
@@ -201,8 +233,11 @@ def finalize_request(chat_id):
     msg_to_david += f"👤 Empleado: {data['nombre']} ({data['legajo']})\n"
     msg_to_david += f"📋 Novedad: {data['tipo']}\n"
     if data['tipo'] == 'Cambio de Turno':
-        msg_to_david += f"❌ Día/Hs Ausente: {data['horas_o_rango']}\n"
+        msg_to_david += f"❌ Día/Hs Ausente: {data['fecha']} ({data['horas_o_rango']})\n"
         msg_to_david += f"♻️ Detalle Compensación:\n{data['detalles']}\n"
+    elif data['tipo'] == 'Reemplazo':
+        msg_to_david += f"📅 Día y Hs: {data['fecha']} ({data['horas_o_rango']})\n"
+        msg_to_david += f"🔄 Tarea/Reemplazo: {data['detalles']}\n"
     else:
         msg_to_david += f"📅 Día: {data['fecha']}\n"
         msg_to_david += f"⏱ Horas: {data['horas_o_rango']}\n"
